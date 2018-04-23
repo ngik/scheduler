@@ -64,13 +64,13 @@ class Process:
 
 #start of helper functions
 
-#return (current_process, current_time, waiting_time)
+#return (current_process, waiting_time)
 def do_pre_compute_bookkeeping(working_process_queue, schedule, current_time, waiting_time):
     #get process to work on and do some recording
     current_process = working_process_queue.pop(0)
     schedule.append((current_time,current_process.id))
     waiting_time = waiting_time + (current_time - current_process.last_worked_time)
-    return (current_process, current_time, waiting_time)
+    return (current_process, waiting_time)
 #enddef
 
 #return (current_time, time_spent)
@@ -81,7 +81,7 @@ def do_compute_bookkeeping(current_process, time_quantum, current_time):
     #time has passed
     current_time = current_time + time_spent
     current_process.last_worked_time = current_time
-
+    
     return (current_time, time_spent)
 #enddef
 
@@ -92,7 +92,7 @@ def do_post_compute_bookkeeping(current_process, working_process_queue, incoming
         working_process_queue.append(current_process)
     #endif
     
-    #fast forward iff no task in rr
+    #fast forward iff no task in working_process_queue
     if (len(working_process_queue) == 0 and len(incoming_process_queue) > 0):
         current_process = incoming_process_queue.pop(0)
         working_process_queue.append(current_process)
@@ -137,7 +137,7 @@ def RR_scheduling(process_list, time_quantum):
     rr.append(rr_process_list.pop(0))
     
     while (len(rr) > 0):
-        (current_process, current_time, waiting_time) = do_pre_compute_bookkeeping(rr, schedule, current_time, waiting_time)
+        (current_process, waiting_time) = do_pre_compute_bookkeeping(rr, schedule, current_time, waiting_time)
         
         (current_time, time_spent) = do_compute_bookkeeping(current_process, time_quantum, current_time)
         
@@ -157,7 +157,43 @@ def RR_scheduling(process_list, time_quantum):
 #enddef
 
 def SRTF_scheduling(process_list):
-    return (["to be completed, scheduling process_list on SRTF, using process.burst_time to calculate the remaining time of the current process "], 0.0)
+    #store the (switching time, proccess_id) pair
+    schedule = []
+    #setting up of variables
+    SRTF_process_list = copy.deepcopy(process_list)
+    active_queue = []
+    current_time = 0
+    waiting_time = 0
+    
+    #adding first task
+    active_queue.append(SRTF_process_list.pop(0))
+    
+    while (len(active_queue) > 0):
+        #sort the active_queue by remaining_burst_time
+        active_queue = sorted(active_queue, key=lambda process: process.remaining_burst_time)
+        
+        if (len(SRTF_process_list) > 0):
+            time_to_interrupt = SRTF_process_list[0].arrive_time
+        else:
+            time_to_interrupt = float('inf')
+        #endif
+        
+        (current_process, waiting_time) = do_pre_compute_bookkeeping(active_queue, schedule, current_time, waiting_time)
+        
+        #compute how long to work before checking for re-schedule
+        time_quantum = min(current_process.remaining_burst_time, time_to_interrupt - current_time)
+        
+        (current_time, time_spent) = do_compute_bookkeeping(current_process, time_quantum, current_time)
+        
+        if (len(SRTF_process_list) > 0 and current_time == SRTF_process_list[0].arrive_time):
+            active_queue.append(SRTF_process_list.pop(0))
+        #endif
+        
+        current_time = do_post_compute_bookkeeping(current_process, active_queue, SRTF_process_list, current_time)
+    #endwhile
+    
+    average_waiting_time = waiting_time/float(len(process_list))
+    return (schedule, average_waiting_time)
 #enddef
 
 def SJF_scheduling(process_list, alpha):
