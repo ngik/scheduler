@@ -23,6 +23,7 @@ class Process:
         self.burst_time = burst_time
         self._remaining_burst_time = burst_time
         self._last_worked_time = arrive_time
+        self._predicted_burst_time = 5
     #enddef
 
     #for printing purpose
@@ -43,7 +44,16 @@ class Process:
     def remaining_burst_time(self):
         return self._remaining_burst_time
     #enddef
-
+    
+    @property
+    def predicted_burst_time(self):
+        return self._predicted_burst_time
+    #enddef
+    @predicted_burst_time.setter
+    def predicted_burst_time(self, predicted_burst_time):
+        self._predicted_burst_time = predicted_burst_time
+    #enddef
+    
     def is_process_completed(self):
         return self._remaining_burst_time == 0
     
@@ -197,7 +207,39 @@ def SRTF_scheduling(process_list):
 #enddef
 
 def SJF_scheduling(process_list, alpha):
-    return (["to be completed, scheduling SJF without using information from process.burst_time"],0.0)
+    #store the (switching time, proccess_id) pair
+    schedule = []
+    #setting up of variables
+    SJF_process_list = copy.deepcopy(process_list)
+    active_queue = []
+    current_time = 0
+    waiting_time = 0
+    
+    #adding first task
+    active_queue.append(SJF_process_list.pop(0))
+    
+    while (len(active_queue) > 0):
+        #sort the active_queue by remaining_burst_time
+        sorted_active_queue = sorted(active_queue, key=lambda process: process.predicted_burst_time)
+        
+        (current_process, waiting_time) = do_pre_compute_bookkeeping(active_queue, schedule, current_time, waiting_time)
+        
+        time_quantum = current_process.remaining_burst_time
+        
+        (current_time, time_spent) = do_compute_bookkeeping(current_process, time_quantum, current_time)
+        
+        current_process.predicted_burst_time = alpha * time_spent + (1 - alpha) * current_process.predicted_burst_time
+        
+        #adding new tasks which have arrived during computation
+        while (len(SJF_process_list) > 0 and current_time > SJF_process_list[0].arrive_time):
+            active_queue.append(SJF_process_list.pop(0))
+        #endwhile
+        
+        current_time = do_post_compute_bookkeeping(current_process, active_queue, SJF_process_list, current_time)
+    #endwhile
+    
+    average_waiting_time = waiting_time/float(len(process_list))
+    return (schedule, average_waiting_time)
 #enddef
 
 def read_input():
