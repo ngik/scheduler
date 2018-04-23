@@ -11,6 +11,7 @@ Output files:
 '''
 
 import sys
+import copy
 
 input_file = 'input.txt'
 
@@ -20,9 +21,88 @@ class Process:
         self.id = id
         self.arrive_time = arrive_time
         self.burst_time = burst_time
+        self._remaining_burst_time = burst_time
+        self._last_worked_time = arrive_time
+    #enddef
+
     #for printing purpose
     def __repr__(self):
         return ('[id %d : arrive_time %d,  burst_time %d]'%(self.id, self.arrive_time, self.burst_time))
+    #enddef
+    
+    @property
+    def last_worked_time(self):
+        return self._last_worked_time
+    #enddef
+    @last_worked_time.setter
+    def last_worked_time(self, last_worked_time):
+        self._last_worked_time = last_worked_time
+    #enddef
+    
+    @property
+    def remaining_burst_time(self):
+        return self._remaining_burst_time
+    #enddef
+
+    def is_process_completed(self):
+        return self._remaining_burst_time == 0
+    
+    #return actual time spent on process
+    def work_done_on_process(self, burst_time):
+        #return time spent
+        if (self._remaining_burst_time > burst_time):
+            self._remaining_burst_time = self._remaining_burst_time - burst_time
+            return burst_time
+        else:
+            time_spent = self._remaining_burst_time
+            self._remaining_burst_time = 0
+            return time_spent
+        #endif
+    #enddef
+#endclass
+
+
+#start of helper functions
+
+#return (current_process, current_time, waiting_time)
+def do_pre_compute_bookkeeping(working_process_queue, schedule, current_time, waiting_time):
+    #get process to work on and do some recording
+    current_process = working_process_queue.pop(0)
+    schedule.append((current_time,current_process.id))
+    waiting_time = waiting_time + (current_time - current_process.last_worked_time)
+    return (current_process, current_time, waiting_time)
+#enddef
+
+#return (current_time, time_spent)
+def do_compute_bookkeeping(current_process, time_quantum, current_time):
+    #doing work
+    time_spent = current_process.work_done_on_process(time_quantum)
+    
+    #time has passed
+    current_time = current_time + time_spent
+    current_process.last_worked_time = current_time
+
+    return (current_time, time_spent)
+#enddef
+
+#return current_time
+def do_post_compute_bookkeeping(current_process, working_process_queue, incoming_process_queue, current_time):
+    #add back current_process if not completed 
+    if (not current_process.is_process_completed()):
+        working_process_queue.append(current_process)
+    #endif
+    
+    #fast forward iff no task in rr
+    if (len(working_process_queue) == 0 and len(incoming_process_queue) > 0):
+        current_process = incoming_process_queue.pop(0)
+        working_process_queue.append(current_process)
+        current_time = current_process.arrive_time
+    #endif
+
+    return current_time
+#enddef
+
+#end of helper functions
 
 def FCFS_scheduling(process_list):
     #store the (switching time, proccess_id) pair
@@ -44,8 +124,36 @@ def FCFS_scheduling(process_list):
 #Input: process_list, time_quantum (Positive Integer)
 #Output_1 : Schedule list contains pairs of (time_stamp, proccess_id) indicating the time switching to that proccess_id
 #Output_2 : Average Waiting Time
-def RR_scheduling(process_list, time_quantum ):
-    return (["to be completed, scheduling process_list on round robin policy with time_quantum"], 0.0)
+def RR_scheduling(process_list, time_quantum):
+    #store the (switching time, proccess_id) pair
+    schedule = []
+    #setting up of variables
+    rr_process_list = copy.deepcopy(process_list)
+    rr = []
+    current_time = 0
+    waiting_time = 0
+    
+    #adding first task
+    rr.append(rr_process_list.pop(0))
+    
+    while (len(rr) > 0):
+        (current_process, current_time, waiting_time) = do_pre_compute_bookkeeping(rr, schedule, current_time, waiting_time)
+        
+        (current_time, time_spent) = do_compute_bookkeeping(current_process, time_quantum, current_time)
+        
+        #adding new tasks which have arrived during computation
+        while (len(rr_process_list) > 0 and current_time > rr_process_list[0].arrive_time):
+            rr.append(rr_process_list.pop(0))
+        #endwhile
+        if (len(rr_process_list) > 0 and current_time == rr_process_list[0].arrive_time):
+            rr.insert(0, rr_process_list.pop(0))
+        #endif
+        
+        current_time = do_post_compute_bookkeeping(current_process, rr, rr_process_list, current_time)
+    #endwhile
+    
+    average_waiting_time = waiting_time/float(len(process_list))
+    return (schedule, average_waiting_time)
 #enddef
 
 def SRTF_scheduling(process_list):
