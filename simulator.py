@@ -292,14 +292,50 @@ def main(argv):
     FCFS_schedule, FCFS_avg_waiting_time =  FCFS_scheduling(process_list)
     write_output('FCFS.txt', FCFS_schedule, FCFS_avg_waiting_time )
     print ("simulating RR ----")
+    #looping for a simple search on optimal solution
+    optimal_solution = [0, float('inf')]
+    for i in range(1, 101):        
+        i = 9 + i * 2 / 100
+        RR_schedule, RR_avg_waiting_time =  RR_scheduling(process_list,time_quantum = i)
+        #write_output('RR' + str(i) + '.txt', RR_schedule, RR_avg_waiting_time )
+        print(str(i) + " has solution of " + str(RR_avg_waiting_time))
+        if (optimal_solution[1] > RR_avg_waiting_time):
+            #print(str(optimal_solution[0]) + " has solution of " + str(optimal_solution[1]))
+            #print(str(i) + " has better solution of " + str(RR_avg_waiting_time))
+            optimal_solution[0] = i
+            optimal_solution[1] = RR_avg_waiting_time
+        #endif
+    #endfor
+    print(optimal_solution)
+    '''
     RR_schedule, RR_avg_waiting_time =  RR_scheduling(process_list,time_quantum = 2)
     write_output('RR.txt', RR_schedule, RR_avg_waiting_time )
+    '''
     print ("simulating SRTF ----")
     SRTF_schedule, SRTF_avg_waiting_time =  SRTF_scheduling(process_list)
     write_output('SRTF.txt', SRTF_schedule, SRTF_avg_waiting_time )
+
     print ("simulating SJF ----")
+    #looping for a simple search on optimal solution
+    optimal_solution = [0, float('inf')]
+    for i in range(1, 101):
+        i = i / 100
+        #i = 0.49 + i * 2 / 10000
+        SJF_schedule, SJF_avg_waiting_time =  SJF_scheduling(process_list, alpha = i)
+        #write_output('SJF' + str(i) + '.txt', SJF_schedule, SJF_avg_waiting_time )
+        #print(str(i) + " has solution of " + str(SJF_avg_waiting_time))
+        if (optimal_solution[1] > SJF_avg_waiting_time):
+            #print(str(optimal_solution[0]) + " has solution of " + str(optimal_solution[1]))
+            #print(str(i) + " has better solution of " + str(SJF_avg_waiting_time))
+            optimal_solution[0] = i
+            optimal_solution[1] = SJF_avg_waiting_time
+        #endif
+    #endfor
+    print(optimal_solution)
+    '''
     SJF_schedule, SJF_avg_waiting_time =  SJF_scheduling(process_list, alpha = 0.5)
     write_output('SJF.txt', SJF_schedule, SJF_avg_waiting_time )
+    '''
 #enddef
 
 if __name__ == '__main__':
