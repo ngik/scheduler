@@ -75,10 +75,20 @@ class Process:
 #start of helper functions
 
 #return (current_process, waiting_time)
-def do_pre_compute_bookkeeping(working_process_queue, schedule, current_time, waiting_time):
+def do_pre_compute_bookkeeping(current_process, working_process_queue, schedule, current_time, waiting_time):
     #get process to work on and do some recording
-    current_process = working_process_queue.pop(0)
-    schedule.append((current_time,current_process.id))
+    if (not current_process):
+        #handle initial state where current_process is None
+        current_process = working_process_queue.pop(0)
+        schedule.append((current_time,current_process.id))
+    else:
+        old_process_id = current_process.id
+        current_process = working_process_queue.pop(0)
+        #record only if switching to a new process
+        if (old_process_id != current_process.id):
+            schedule.append((current_time,current_process.id))
+        #endif
+    #endif
     waiting_time = waiting_time + (current_time - current_process.last_worked_time)
     return (current_process, waiting_time)
 #enddef
@@ -138,28 +148,26 @@ def RR_scheduling(process_list, time_quantum):
     #store the (switching time, proccess_id) pair
     schedule = []
     #setting up of variables
-    rr_process_list = copy.deepcopy(process_list)
-    rr = []
+    RR_process_list = copy.deepcopy(process_list)
+    active_queue = []
     current_time = 0
     waiting_time = 0
+    current_process = None
     
     #adding first task
-    rr.append(rr_process_list.pop(0))
+    active_queue.append(RR_process_list.pop(0))
     
-    while (len(rr) > 0):
-        (current_process, waiting_time) = do_pre_compute_bookkeeping(rr, schedule, current_time, waiting_time)
+    while (len(active_queue) > 0):
+        (current_process, waiting_time) = do_pre_compute_bookkeeping(current_process, active_queue, schedule, current_time, waiting_time)
         
         (current_time, time_spent) = do_compute_bookkeeping(current_process, time_quantum, current_time)
         
         #adding new tasks which have arrived during computation
-        while (len(rr_process_list) > 0 and current_time > rr_process_list[0].arrive_time):
-            rr.append(rr_process_list.pop(0))
+        while (len(RR_process_list) > 0 and current_time >= RR_process_list[0].arrive_time):
+            active_queue.append(RR_process_list.pop(0))
         #endwhile
-        if (len(rr_process_list) > 0 and current_time == rr_process_list[0].arrive_time):
-            rr.insert(0, rr_process_list.pop(0))
-        #endif
         
-        current_time = do_post_compute_bookkeeping(current_process, rr, rr_process_list, current_time)
+        current_time = do_post_compute_bookkeeping(current_process, active_queue, RR_process_list, current_time)
     #endwhile
     
     average_waiting_time = waiting_time/float(len(process_list))
@@ -174,6 +182,7 @@ def SRTF_scheduling(process_list):
     active_queue = []
     current_time = 0
     waiting_time = 0
+    current_process = None
     
     #adding first task
     active_queue.append(SRTF_process_list.pop(0))
@@ -188,7 +197,7 @@ def SRTF_scheduling(process_list):
             time_to_interrupt = float('inf')
         #endif
         
-        (current_process, waiting_time) = do_pre_compute_bookkeeping(active_queue, schedule, current_time, waiting_time)
+        (current_process, waiting_time) = do_pre_compute_bookkeeping(current_process, active_queue, schedule, current_time, waiting_time)
         
         #compute how long to work before checking for re-schedule
         time_quantum = min(current_process.remaining_burst_time, time_to_interrupt - current_time)
@@ -214,24 +223,33 @@ def SJF_scheduling(process_list, alpha):
     active_queue = []
     current_time = 0
     waiting_time = 0
+    current_process = None
+    history = dict()
     
     #adding first task
     active_queue.append(SJF_process_list.pop(0))
     
     while (len(active_queue) > 0):
-        #sort the active_queue by remaining_burst_time
-        sorted_active_queue = sorted(active_queue, key=lambda process: process.predicted_burst_time)
+        #sort the active_queue by predicted_burst_time
+        for id, past_predicted_burst_time in history.items():
+            matching_ids = list(filter(lambda process: process.id == id, active_queue))
+            if (len(matching_ids) > 0):
+                matching_ids[0].predicted_burst_time = past_predicted_burst_time
+            #endif
+        #endfor
+        active_queue = sorted(active_queue, key=lambda process: process.predicted_burst_time)
         
-        (current_process, waiting_time) = do_pre_compute_bookkeeping(active_queue, schedule, current_time, waiting_time)
+        (current_process, waiting_time) = do_pre_compute_bookkeeping(current_process, active_queue, schedule, current_time, waiting_time)
         
         time_quantum = current_process.remaining_burst_time
         
         (current_time, time_spent) = do_compute_bookkeeping(current_process, time_quantum, current_time)
         
         current_process.predicted_burst_time = alpha * time_spent + (1 - alpha) * current_process.predicted_burst_time
+        history[current_process.id] = current_process.predicted_burst_time
         
         #adding new tasks which have arrived during computation
-        while (len(SJF_process_list) > 0 and current_time > SJF_process_list[0].arrive_time):
+        while (len(SJF_process_list) > 0 and current_time >= SJF_process_list[0].arrive_time):
             active_queue.append(SJF_process_list.pop(0))
         #endwhile
         
